@@ -21,6 +21,27 @@ class HostCommandTests(unittest.TestCase):
         self.assertNotIn('workspace-write', cmd)
         self.assertEqual(cmd[-1], 'hello')
 
+    def test_codex_windows_backend_is_explicit_without_relaxing_read_only(self):
+        cmd = runner.command('codex', 'hello', platform='win32')
+        self.assertEqual(cmd[cmd.index('-c') + 1], 'windows.sandbox="elevated"')
+        self.assertEqual(cmd[cmd.index('--sandbox') + 1], 'read-only')
+        self.assertIn('--ignore-user-config', cmd)
+        self.assertNotIn('--dangerously-bypass-approvals-and-sandbox', cmd)
+
+    def test_nonwindows_codex_omits_windows_backend(self):
+        cmd = runner.command('codex', 'hello', platform='linux')
+        self.assertNotIn('-c', cmd)
+        self.assertEqual(cmd[cmd.index('--sandbox') + 1], 'read-only')
+
+    def test_codex_successful_tool_event_is_not_skill_activation(self):
+        raw = (b'{"type":"item.completed","item":{"type":"command_execution",'
+               b'"status":"completed","exit_code":0}}\n{"type":"turn.completed"}\n')
+        result = runner.summarize_stream('codex', raw, 0)
+        self.assertEqual(result['tool_access'], 'command_executed')
+        self.assertEqual(result['successful_command_count'], 1)
+        self.assertEqual(result['skill_activation'], 'unknown')
+        self.assertEqual(result['verification'], 'unknown')
+
     def test_claude_plan_mode(self):
         cmd = runner.command('claude', 'hello')
         self.assertIn('plan', cmd)

@@ -23,6 +23,17 @@ class BoundedHostProcessTests(unittest.TestCase):
         self.assertFalse(result.overflow)
         self.assertEqual(pilot_host.summarize_stream('codex', result.stdout, result.returncode)['process_status'], 'completed')
 
+    def test_policy_denial_detected_from_stderr_without_returning_it(self):
+        code = 'import sys; sys.stderr.write("exec_command failed: Rejected: blocked by policy")'
+        captured = self.invoke(code)
+        self.assertTrue(captured.policy_blocked)
+        self.assertNotIn(b'blocked by policy', captured.stdout)
+
+    def test_stderr_scanner_handles_chunk_boundary(self):
+        code = ('import sys; sys.stderr.write("x" * (64 * 1024 - 8)); '
+                'sys.stderr.write("blocked by policy")')
+        self.assertTrue(self.invoke(code).policy_blocked)
+
     def test_real_subprocess_nonzero_is_not_success(self):
         result = self.invoke('import sys; sys.exit(7)')
         self.assertEqual(result.returncode, 7)
@@ -48,6 +59,23 @@ class BoundedHostProcessTests(unittest.TestCase):
 
 
 class EndToEndWithoutLiveAgent(unittest.TestCase):
+    def test_policy_denial_cannot_be_reported_as_completed_pilot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            fixtures = tmp / 'fixtures'
+            prepare(fixtures)
+            workspace = tmp / 'denied-run'
+            source = Path(__file__).resolve().parents[1]
+            def denied(*args, **kwargs):
+                return pilot_host.CaptureResult(0, b'{"type":"turn.completed"}\n', False, False, True)
+            with patch('pilot_host.shutil.which', return_value=sys.executable), \
+                 patch('pilot_host.capture_bounded', side_effect=denied):
+                outcome = pilot_host.run(fixtures, workspace, 'codex', 'adopt-existing', source)
+            self.assertEqual(outcome['process_status'], 'failed_or_unconfirmed')
+            self.assertEqual(outcome['tool_access'], 'blocked')
+            self.assertEqual(outcome['verification'], 'unknown')
+            self.assertTrue(outcome['workspace_unchanged'])
+
     def test_real_host_runner_uses_disposable_fixture_and_no_result_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)

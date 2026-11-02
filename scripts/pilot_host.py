@@ -37,6 +37,7 @@ class CaptureResult:
     stdout: bytes
     timed_out: bool
     overflow: bool
+    policy_blocked: bool = False
 
 
 def capture_bounded(cmd: list[str], cwd: Path, env: dict[str, str], timeout: float) -> CaptureResult:
@@ -49,10 +50,11 @@ def capture_bounded(cmd: list[str], cwd: Path, env: dict[str, str], timeout: flo
     output = bytearray()
     overflow = threading.Event()
     reader_failed = threading.Event()
+    policy_blocked = threading.Event()
     process = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
-                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                bufsize=0)
-    assert process.stdout is not None
+    assert process.stdout is not None and process.stderr is not None
 
     def read_output() -> None:
         try:
@@ -70,8 +72,28 @@ def capture_bounded(cmd: list[str], cwd: Path, env: dict[str, str], timeout: flo
             if process.poll() is None:
                 process.kill()
 
+    def inspect_stderr() -> None:
+        """Scan stderr for a specific policy denial; never store stderr content."""
+        needle = b'blocked by policy'
+        tail = b''
+        try:
+            while True:
+                chunk = process.stderr.read(64 * 1024)
+                if not chunk:
+                    break
+                window = (tail + chunk).lower()
+                if needle in window:
+                    policy_blocked.set()
+                tail = window[-(len(needle) - 1):]
+        except (OSError, ValueError):
+            reader_failed.set()
+            if process.poll() is None:
+                process.kill()
+
     reader = threading.Thread(target=read_output, daemon=True, name='host-output-reader')
+    error_reader = threading.Thread(target=inspect_stderr, daemon=True, name='host-stderr-scanner')
     reader.start()
+    error_reader.start()
     timed_out = False
     try:
         try:
@@ -81,20 +103,25 @@ def capture_bounded(cmd: list[str], cwd: Path, env: dict[str, str], timeout: flo
             process.kill()
             process.wait(timeout=5)
         reader.join(timeout=5)
-        if reader.is_alive() or reader_failed.is_set():
-            raise HostPilotError('Unable to safely capture host output')
-        return CaptureResult(process.returncode, bytes(output), timed_out, overflow.is_set())
+        error_reader.join(timeout=5)
+        if reader.is_alive() or error_reader.is_alive() or reader_failed.is_set():
+            raise HostPilotError('Unable to safely classify host output')
+        return CaptureResult(process.returncode, bytes(output), timed_out,
+                             overflow.is_set(), policy_blocked.is_set())
     finally:
         if process.poll() is None:
             process.kill()
             process.wait(timeout=5)
         process.stdout.close()
+        process.stderr.close()
 
 
-def command(host: str, prompt: str) -> list[str]:
+def command(host: str, prompt: str, *, platform: str | None = None) -> list[str]:
     """Conservative command lines; no shell interpolation or write permission."""
     if host == 'codex':
-        return ['codex', 'exec', '--json', '--ephemeral', '--ignore-user-config', '--sandbox', 'read-only', prompt]
+        windows_sandbox = ['-c', 'windows.sandbox="elevated"'] if (platform or sys.platform) == 'win32' else []
+        return ['codex', 'exec', '--json', '--ephemeral', '--ignore-user-config',
+                *windows_sandbox, '--sandbox', 'read-only', prompt]
     if host == 'claude':
         return ['claude', '-p', '--output-format', 'stream-json', '--verbose',
                 '--no-session-persistence', '--permission-mode', 'plan',
@@ -131,6 +158,7 @@ def summarize_stream(host: str, raw: bytes, exit_code: int) -> dict:
     events = 0
     malformed = 0
     completed = False
+    successful_commands = 0
     for line in raw.splitlines():
         if not line.strip():
             continue
@@ -146,6 +174,11 @@ def summarize_stream(host: str, raw: bytes, exit_code: int) -> dict:
         if isinstance(item, dict):
             if host == 'codex' and item.get('type') == 'turn.completed':
                 completed = True
+            if host == 'codex' and item.get('type') == 'item.completed':
+                tool = item.get('item')
+                if (isinstance(tool, dict) and tool.get('type') == 'command_execution'
+                        and tool.get('status') == 'completed' and tool.get('exit_code') == 0):
+                    successful_commands += 1
             if host == 'claude' and item.get('type') == 'result' and not item.get('is_error', False):
                 completed = True
     return {
@@ -157,6 +190,8 @@ def summarize_stream(host: str, raw: bytes, exit_code: int) -> dict:
         'observed': 'invoke' if signal else 'unknown',
         'verification': 'unknown',
         'skill_tokens': None,
+        'tool_access': 'command_executed' if successful_commands else 'unverified',
+        'successful_command_count': successful_commands,
         'warning': 'No activation signal does not prove skip. Host completion does not prove correct skill behavior.',
     }
 
@@ -221,6 +256,9 @@ def run(fixtures: Path, dest: Path, host: str, case: str, source: Path, timeout:
                   'verification': 'unknown', 'warning': 'Host output limit exceeded during capture; not evaluated'}
     else:
         result = summarize_stream(host, capture.stdout, capture.returncode)
+        if capture.policy_blocked:
+            result.update(process_status='failed_or_unconfirmed', tool_access='blocked',
+                          warning='Host tool execution was rejected by policy; task outcome not verified.')
     # No raw stdout, stderr, prompt, final answer, session transcript or tokens
     # written to a file or returned to the caller.
     return {**info, **result, 'will_launch': True, 'workspace_unchanged': before == _digest(dest),

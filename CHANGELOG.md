@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Windows Codex pilot access
+
+- On Windows, explicitly select the elevated Codex sandbox backend while keeping `--ignore-user-config` and `--sandbox read-only`; other platforms are unchanged.
+- Detect stderr policy denials without storing stderr; blocked tool access prevents exit-zero sessions from being reported as completed pilots.
+- Count successful Codex command executions separately from unknown skill activation and unverified task outcomes.
+- Add regression tests covering platform flags, stderr denials and disposable workspace integrity.
+
 ## Unreleased — Python CLI import reliability
 
 - Renamed the project metadata scanner from `scripts/inspect.py` to `scripts/project_inspector.py` so direct script invocation cannot shadow Python's standard-library `inspect` module.
