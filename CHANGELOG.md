@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — v8.4 pilot evidence-quality refinement
+
+- Replaced the answer-leading `avoid-duplicate` prompt with a neutral release-readiness assessment requiring actual repository and skill inspection.
+- Bumped reproducible fixture manifest schema to 2 to reject the prior v8.3 fixture set; existing Git-private reviewer measurements must remain unchanged and are not comparable across prompt revisions.
+- Added two RED-to-GREEN regression tests. No host activation claims, automatic grading, telemetry, or new skill behavior.
+
 ## Unreleased — Windows skill-installation ACL compatibility
 
 - Use unique, exclusively created staging directories inheriting parent ACLs on Windows instead of Python 3.13 private `mkdtemp()` ACLs; keep private `0700` staging on Linux/macOS.
