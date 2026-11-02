@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Python CLI import reliability
+
+- Renamed the project metadata scanner from `scripts/inspect.py` to `scripts/project_inspector.py` so direct script invocation cannot shadow Python's standard-library `inspect` module.
+- Updated project instructions, command examples and test imports; added regression tests for standard-library imports from `scripts/` and for the standalone pilot entry point.
+- No change to skill decision logic, host invocation permissions, or pilot outcome accounting.
+
 ## v8.3 — Bounded host capture and process-level test hardening
 
 - Replaced post-capture stdout size checking with incremental capture and a strict memory budget. Oversized host output stops the child process and produces `unknown`, not an activation assertion.

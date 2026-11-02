@@ -16,12 +16,27 @@ def load(name):
     return module
 
 
-inspect = load("inspect")
+project_inspector = load("project_inspector")
 distribute = load("distribute")
 validate = load("validate")
 
 
 class SkillArchitectureTests(unittest.TestCase):
+    def test_standard_library_inspect_is_not_shadowed_from_script_directory(self):
+        # Direct script execution puts scripts/ first on sys.path.
+        completed = subprocess.run(
+            [sys.executable, "-S", "-c", "import inspect; assert callable(inspect.get_annotations)"],
+            cwd=ROOT / "scripts", capture_output=True, text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+
+    def test_standalone_pilot_host_entrypoint_is_importable(self):
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/pilot_host.py"), "--help"],
+            cwd=ROOT, capture_output=True, text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+
     def test_baseline_skill_is_valid(self):
         self.assertEqual(validate.check(ROOT), [])
 
@@ -38,7 +53,7 @@ class SkillArchitectureTests(unittest.TestCase):
             path.mkdir(parents=True)
             (path / "SKILL.md").write_text("---\nname: ship\ndescription: Release\n---\nDo work", encoding="utf-8")
             before = set(repo.rglob("*"))
-            summary = inspect.inspect(repo)
+            summary = project_inspector.inspect(repo)
             self.assertEqual(summary["instructions"], ["AGENTS.md"])
             self.assertEqual(summary["skill_roots"][".claude/skills"][0]["name"], "ship")
             self.assertEqual(set(repo.rglob("*")), before)

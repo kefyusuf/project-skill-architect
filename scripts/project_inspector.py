@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Read-only, bounded snapshot of a project's Agent Skills integration.
 
-Usage: python inspect.py --repo /path/to/repository
+Usage: python project_inspector.py --repo /path/to/repository
 Does not inspect secret files or application source code. No repository writes.
 """
 from __future__ import annotations
