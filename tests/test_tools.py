@@ -75,6 +75,24 @@ class SkillArchitectureTests(unittest.TestCase):
             plan = distribute.plan(ROOT, repo, "common,claude")
             self.assertEqual([status for _, status, _ in plan], ["CREATE", "BLOCK"])
 
+    def test_staging_modes_preserve_platform_security_contract(self):
+        self.assertEqual(distribute._staging_mode("win32"), 0o777)
+        self.assertEqual(distribute._staging_mode("linux"), 0o700)
+        self.assertEqual(distribute._staging_mode("darwin"), 0o700)
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows ACL inheritance check")
+    def test_windows_installation_inherits_parent_acl(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            target = Path(scratch) / "repo" / ".agents" / "skills" / "project-skill-architect"
+            files = distribute.source_files(ROOT)
+            distribute.install(ROOT, target, files, distribute.fingerprints(files))
+            script = "(Get-Acl -LiteralPath '" + str(target).replace("'", "''") + "').AreAccessRulesProtected"
+            result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                                    capture_output=True, text=True, timeout=20)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip().lower(), "false",
+                             "Installed skill directory must inherit the parent's ACL")
+
     def test_managed_copy_detects_local_changes_and_repeated_sync(self):
         with tempfile.TemporaryDirectory() as scratch:
             repo = Path(scratch)

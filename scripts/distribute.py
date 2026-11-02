@@ -12,7 +12,6 @@ import json
 import re
 import shutil
 import sys
-import tempfile
 import uuid
 from pathlib import Path
 
@@ -83,10 +82,18 @@ def target_state(target: Path, desired: dict[str, str]) -> tuple[str, str]:
     return ("UPDATE", "previously managed copy is unmodified")
 
 
+def _staging_mode(platform: str) -> int:
+    # Installed skills must be readable by the host's sandbox account.
+    # Windows mkdtemp() forces a protected 0700 DACL; inherit the parent ACL
+    # instead. Keep a private staging directory on POSIX.
+    return 0o777 if platform == "win32" else 0o700
+
+
 def install(source: Path, target: Path, files: dict[str, Path], desired: dict[str, str]) -> None:
     parent = target.parent
     parent.mkdir(parents=True, exist_ok=True)
-    stage = Path(tempfile.mkdtemp(prefix=f".{target.name}.stage-", dir=parent))
+    stage = parent / f".{target.name}.stage-{uuid.uuid4().hex}"
+    stage.mkdir(mode=_staging_mode(sys.platform))
     backup: Path | None = None
     try:
         for relative, path in files.items():

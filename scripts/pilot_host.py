@@ -159,6 +159,8 @@ def summarize_stream(host: str, raw: bytes, exit_code: int) -> dict:
     malformed = 0
     completed = False
     successful_commands = 0
+    failed_commands = 0
+    access_denied = False
     for line in raw.splitlines():
         if not line.strip():
             continue
@@ -176,13 +178,26 @@ def summarize_stream(host: str, raw: bytes, exit_code: int) -> dict:
                 completed = True
             if host == 'codex' and item.get('type') == 'item.completed':
                 tool = item.get('item')
-                if (isinstance(tool, dict) and tool.get('type') == 'command_execution'
-                        and tool.get('status') == 'completed' and tool.get('exit_code') == 0):
-                    successful_commands += 1
+                if isinstance(tool, dict) and tool.get('type') == 'command_execution':
+                    if tool.get('status') == 'completed' and tool.get('exit_code') == 0:
+                        successful_commands += 1
+                    else:
+                        failed_commands += 1
+                    # PowerShell may exit zero even when one file read fails.
+                    # Inspect only ephemeral output text; never persist paths.
+                    output = tool.get('aggregated_output')
+                    if isinstance(output, str):
+                        lower = output.lower()
+                        access_denied |= any(marker in lower for marker in (
+                            'access is denied', 'permission denied',
+                            'unauthorizedaccessexception',
+                            'itemexistsunauthorizedaccesserror'))
             if host == 'claude' and item.get('type') == 'result' and not item.get('is_error', False):
                 completed = True
     return {
-        'process_status': 'completed' if exit_code == 0 and completed else 'failed_or_unconfirmed',
+        'process_status': ('completed' if exit_code == 0 and completed
+                           and not failed_commands and not access_denied
+                           else 'failed_or_unconfirmed'),
         'exit_code': exit_code,
         'event_count': events,
         'malformed_event_count': malformed,
@@ -190,9 +205,14 @@ def summarize_stream(host: str, raw: bytes, exit_code: int) -> dict:
         'observed': 'invoke' if signal else 'unknown',
         'verification': 'unknown',
         'skill_tokens': None,
-        'tool_access': 'command_executed' if successful_commands else 'unverified',
+        'tool_access': ('access_denied' if access_denied else
+                        'partial_or_failed' if failed_commands else
+                        'command_executed' if successful_commands else 'unverified'),
         'successful_command_count': successful_commands,
-        'warning': 'No activation signal does not prove skip. Host completion does not prove correct skill behavior.',
+        'failed_command_count': failed_commands,
+        'warning': ('Tool access was denied or incomplete; task outcome not verified.'
+                    if failed_commands or access_denied else
+                    'No activation signal does not prove skip. Host completion does not prove correct skill behavior.'),
     }
 
 

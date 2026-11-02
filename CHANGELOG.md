@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Windows skill-installation ACL compatibility
+
+- Use unique, exclusively created staging directories inheriting parent ACLs on Windows instead of Python 3.13 private `mkdtemp()` ACLs; keep private `0700` staging on Linux/macOS.
+- Detect failed commands and access-denied output even when PowerShell or Codex exits 0, without persisting tool output.
+- Add Windows ACL inheritance and cross-platform staging regression tests. No sandbox bypass or global ACL mutation.
+
+
 ## Unreleased — Windows Codex pilot access
 
 - On Windows, explicitly select the elevated Codex sandbox backend while keeping `--ignore-user-config` and `--sandbox read-only`; other platforms are unchanged.

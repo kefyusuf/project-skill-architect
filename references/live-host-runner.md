@@ -51,6 +51,11 @@ Use a fresh `$fixtures` name if you already prepared the fixtures; the tool inte
 
 On Windows, Codex uses the same `read-only` permissions plus an explicit Windows sandbox backend when user config is ignored. This fixes the observed `blocked by policy` shell-tool failure on Codex CLI 0.166.0. A command execution only confirms a tool ran; it does not prove the skill activated.
 
+The distributor stages the shared skill using inherited Windows ACLs instead
+of the private `tempfile.mkdtemp()` ACL; POSIX staging remains mode `0700`.
+This prevents a private staging ACL from blocking the separate sandbox identity.
+It does not override intentionally restricted parent directory permissions.
+
 ## Reading results
 
 ```json
@@ -63,7 +68,7 @@ On Windows, Codex uses the same `read-only` permissions plus an explicit Windows
 }
 ```
 
-This means the *host process* completed according to the host's structured stream; **nothing was concluded about the skill**. The optional `tool_access` field is `command_executed` only when a successful Codex command event is observed, `unverified` when none is observed, or `blocked` when stderr contains a policy denial. `blocked` forces `process_status=failed_or_unconfirmed` even if the CLI exits 0. No command event, even a successful file read, proves that a skill activated. If a supported named Claude `Skill` tool call is visible, `skill_activation` may read `host_tool_signal` and `observed` may read `invoke`. Absence of that call is **never** recorded as `skip`.
+This means the *host process* completed according to the host's structured stream; **nothing was concluded about the skill**. The optional `tool_access` field is `command_executed` only when successful Codex command events have no detected failure, `unverified` when none is observed, `partial_or_failed` for failed commands, `access_denied` for filesystem denial in tool output, or `blocked` for stderr policy denial. These failure cases force `process_status=failed_or_unconfirmed` even if the CLI exits 0. No command event, even a successful file read, proves that a skill activated. If a supported named Claude `Skill` tool call is visible, `skill_activation` may read `host_tool_signal` and `observed` may read `invoke`. Absence of that call is **never** recorded as `skip`.
 
 After inspecting genuine host evidence and the resulting behavior, use the existing private `scripts/pilot.py init` / `record` / `report` workflow. Use `reviewed_manual` if there is a human-reviewed observation but no explicit host activation event; only record `host_trace` if the trace actually verifies invocation. Leave unknown cases unrecorded, including the unobservable negative cases. Token totals for the *entire* CLI session are not skill-specific token costs; keep `skill_tokens=null`.
 

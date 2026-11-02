@@ -76,6 +76,38 @@ class HostCommandTests(unittest.TestCase):
         self.assertEqual(result['observed'], 'unknown')
         self.assertIsNone(result['skill_tokens'])
 
+    def test_codex_failed_command_prevents_false_completed_pilot(self):
+        events = [
+            {'type': 'item.completed', 'item': {
+                'type': 'command_execution', 'status': 'failed',
+                'exit_code': 1, 'aggregated_output': 'rg: Access is denied.'}},
+            {'type': 'item.completed', 'item': {
+                'type': 'command_execution', 'status': 'completed',
+                'exit_code': 0, 'aggregated_output': '# Synthetic rules'}},
+            {'type': 'turn.completed'},
+        ]
+        raw = ('\n'.join(json.dumps(event) for event in events) + '\n').encode()
+        result = runner.summarize_stream('codex', raw, 0)
+        self.assertEqual(result['process_status'], 'failed_or_unconfirmed')
+        self.assertEqual(result['tool_access'], 'access_denied')
+        self.assertEqual(result['successful_command_count'], 1)
+        self.assertEqual(result['failed_command_count'], 1)
+        self.assertEqual(result['skill_activation'], 'unknown')
+
+    def test_codex_access_denied_inside_zero_exit_command_is_detected(self):
+        events = [
+            {'type': 'item.completed', 'item': {
+                'type': 'command_execution', 'status': 'completed', 'exit_code': 0,
+                'aggregated_output': 'Get-Content : Access is denied'}},
+            {'type': 'turn.completed'},
+        ]
+        result = runner.summarize_stream(
+            'codex', ('\n'.join(json.dumps(event) for event in events) + '\n').encode(), 0)
+        self.assertEqual(result['process_status'], 'failed_or_unconfirmed')
+        self.assertEqual(result['tool_access'], 'access_denied')
+        self.assertEqual(result['failed_command_count'], 0)
+        self.assertEqual(result['verification'], 'unknown')
+
     def test_trace_invocation_does_not_prove_pass(self):
         raw = json.dumps({'type': 'assistant', 'message': {'content': [
             {'type': 'tool_use', 'name': 'Skill', 'input': {'skill': 'project-skill-architect'}}]}}).encode()
