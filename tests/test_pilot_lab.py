@@ -31,6 +31,26 @@ class PilotLabTests(unittest.TestCase):
         self.assertEqual(sum(x['expected'] == 'invoke' for x in meta['cases'].values()), 5)
         self.assertEqual(sum(x['expected'] == 'skip' for x in meta['cases'].values()), 3)
 
+    def test_avoid_duplicate_prompt_requires_evidence_without_prejudging_coverage(self):
+        prompt = pilot_lab.CASES['avoid-duplicate'][1]
+        self.assertEqual(prompt, (
+            'Our team wants an Agent Skill to support release readiness. '
+            'Examine the existing project rules, skills, and repository evidence. '
+            'Decide whether a new skill is justified, an existing skill should be revised, '
+            'or no change is necessary. Explain the evidence. Do not modify files.'
+        ))
+        self.assertEqual(pilot_lab.CASES['avoid-duplicate'][0], 'invoke')
+        self.assertNotIn('already covers', prompt.lower())
+
+    def test_v84_fixture_schema_does_not_accept_prior_suite_manifest(self):
+        self.assertEqual(pilot_lab.SCHEMA, 2)
+        legacy = self.fixtures / 'pilot-lab.json'
+        payload = json.loads(legacy.read_text(encoding='utf-8'))
+        payload['schema_version'] = 1
+        legacy.write_text(json.dumps(payload), encoding='utf-8')
+        with self.assertRaises(pilot_lab.LabError):
+            pilot_lab.verify(self.fixtures)
+
     def test_git_history_for_code_only_change_and_workflow_change(self):
         for case in ('review-noop', 'evolve-meaningful'):
             out = subprocess.check_output(['git', '-C', str(self.fixtures / case), 'rev-list', '--count', 'HEAD'], text=True)
