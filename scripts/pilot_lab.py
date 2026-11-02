@@ -20,12 +20,12 @@ CASES = {
     'adopt-existing': ('invoke', 'Join this existing example repository. Inspect existing rules and skills before proposing changes; do not edit anything.'),
     'evolve-meaningful': ('invoke', 'We added a new deployment workflow and keep making the same release mistake. Should our skill architecture change? Provide evidence first.'),
     'review-noop': ('invoke', 'Review our skill architecture after a small unrelated code-only PR. Is any skill change actually justified?'),
-    'avoid-duplicate': ('invoke', 'Should we make a new skill for a workflow that our existing release skill already covers?'),
+    'avoid-duplicate': ('invoke', 'Our team wants an Agent Skill to support release readiness. Examine the existing project rules, skills, and repository evidence. Decide whether a new skill is justified, an existing skill should be revised, or no change is necessary. Explain the evidence. Do not modify files.'),
     'unrelated-bugfix': ('skip', 'Fix this failing unit test in the example application.'),
     'unrelated-writing': ('skip', 'Proofread this brief paragraph for grammar.'),
     'routine-code-change': ('skip', 'Rename a variable in the example application\'s test fixture.'),
 }
-SCHEMA = 1
+SCHEMA = 2
 IGNORE = {'pilot-lab.json'}
 
 
