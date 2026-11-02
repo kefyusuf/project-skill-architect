@@ -12,6 +12,10 @@ This is the missing **test-environment preparation** step for the v8 manual pilo
 - This laboratory has no evidence of real host skill activation. A `local_setup_detected` preflight result only confirms a local CLI executable and a skill file, not actual discovery by the running host.
 - Never run live pilot sessions in production repositories or in the canonical fixture templates. Use a **new staged copy for every case, phase and host**, as original test sessions may mutate the workspace.
 
+## v8.4 — Neutral duplicate-avoidance prompt
+
+The `avoid-duplicate` task now asks the agent to assess release readiness without asserting that an existing release skill already covers it. Fixture manifest `schema_version` is **2** to prevent a v8.3 fixture bundle from silently being reused for this revised task. `prepare` a fresh fixture directory (e.g., `psa-fixtures-v84`), stage fresh workspaces, and keep the earlier Git-private `pilot.py` results unchanged. Start a new pilot ID (e.g., `skill-pilot-v84`) because v8.3 versus v8.4 prompts are **not** directly comparable. The metadata-only pilot result schema remains v1; it does not independently attest to scenario/prompt versions.
+
 ## Step-by-step setup
 
 All commands below run from the extracted `project-skill-architect` directory. Use a private scratch directory outside any production project, and do not commit pilot result files.
