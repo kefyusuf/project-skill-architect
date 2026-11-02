@@ -90,7 +90,7 @@ class EvolutionTests(unittest.TestCase):
     def test_checkpoint_rejects_windows_style_evidence_paths(self):
         # External JSON evidence must use portable repository-relative POSIX paths.
         change = {"status": "review_suggested", "signals": [
-            {"kind": "skill", "paths": [r".agents\\skills\\build\\SKILL.md"]}]}
+            {"kind": "skill", "paths": [r".agents\skills\build\SKILL.md"]}]}
         with self.assertRaises(evolution.EvolutionError):
             self.assess(checkpoint=change)
 
