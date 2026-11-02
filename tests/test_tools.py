@@ -4,6 +4,7 @@ import tempfile
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -80,19 +81,16 @@ class SkillArchitectureTests(unittest.TestCase):
         self.assertEqual(distribute._staging_mode("linux"), 0o700)
         self.assertEqual(distribute._staging_mode("darwin"), 0o700)
 
-    @unittest.skipUnless(sys.platform == "win32", "Windows ACL inheritance check")
-    def test_windows_installation_inherits_parent_acl(self):
+    def test_distributor_does_not_create_private_mkdtemp_stage(self):
+        # tempfile.mkdtemp() applies a protected Windows ACL. Installing a
+        # shareable skill must use a unique directory created with the chosen
+        # platform mode instead.
         with tempfile.TemporaryDirectory() as scratch:
             target = Path(scratch) / "repo" / ".agents" / "skills" / "project-skill-architect"
             files = distribute.source_files(ROOT)
-            distribute.install(ROOT, target, files, distribute.fingerprints(files))
-            # Use native icacls: the PowerShell Security module is not guaranteed
-            # to autoload in CI runners. (I) marks inherited Windows ACEs.
-            result = subprocess.run(["icacls", str(target)],
-                                    capture_output=True, text=True, timeout=20)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("(I)", result.stdout,
-                          "Installed skill directory must inherit the parent's ACL")
+            with patch("tempfile.mkdtemp", side_effect=AssertionError("private stage is forbidden")):
+                distribute.install(ROOT, target, files, distribute.fingerprints(files))
+            self.assertTrue((target / "SKILL.md").is_file())
 
     def test_managed_copy_detects_local_changes_and_repeated_sync(self):
         with tempfile.TemporaryDirectory() as scratch:
