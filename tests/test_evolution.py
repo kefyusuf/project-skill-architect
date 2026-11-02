@@ -80,12 +80,19 @@ class EvolutionTests(unittest.TestCase):
         skill = self.repo / ".agents/skills/build/SKILL.md"
         skill.parent.mkdir(parents=True)
         skill.write_text("---\nname: build\n---\n")
-        change = {"status": "review_suggested", "signals": [{"kind": "skill", "paths": [str(skill.relative_to(self.repo))]}]}
+        change = {"status": "review_suggested", "signals": [{"kind": "skill", "paths": [skill.relative_to(self.repo).as_posix()]}]}
         result = self.assess(checkpoint=change)
         self.assertEqual(result["status"], "review_recommended")
         self.assertEqual(result["recommendation"]["candidate_key"], "checkpoint:skill")
         only_ci = {"status": "review_suggested", "signals": [{"kind": "ci", "paths": [".github/workflows/test.yml"]}]}
         self.assertEqual(self.assess(checkpoint=only_ci)["status"], "watch")
+
+    def test_checkpoint_rejects_windows_style_evidence_paths(self):
+        # External JSON evidence must use portable repository-relative POSIX paths.
+        change = {"status": "review_suggested", "signals": [
+            {"kind": "skill", "paths": [r".agents\\skills\\build\\SKILL.md"]}]}
+        with self.assertRaises(evolution.EvolutionError):
+            self.assess(checkpoint=change)
 
     def test_no_changes_with_comparison_is_no_change(self):
         result = self.assess(checkpoint={"status": "no_relevant_change", "signals": []})
