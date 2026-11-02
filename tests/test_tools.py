@@ -86,12 +86,13 @@ class SkillArchitectureTests(unittest.TestCase):
             target = Path(scratch) / "repo" / ".agents" / "skills" / "project-skill-architect"
             files = distribute.source_files(ROOT)
             distribute.install(ROOT, target, files, distribute.fingerprints(files))
-            script = "(Get-Acl -LiteralPath '" + str(target).replace("'", "''") + "').AreAccessRulesProtected"
-            result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+            # Use native icacls: the PowerShell Security module is not guaranteed
+            # to autoload in CI runners. (I) marks inherited Windows ACEs.
+            result = subprocess.run(["icacls", str(target)],
                                     capture_output=True, text=True, timeout=20)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout.strip().lower(), "false",
-                             "Installed skill directory must inherit the parent's ACL")
+            self.assertIn("(I)", result.stdout,
+                          "Installed skill directory must inherit the parent's ACL")
 
     def test_managed_copy_detects_local_changes_and_repeated_sync(self):
         with tempfile.TemporaryDirectory() as scratch:
