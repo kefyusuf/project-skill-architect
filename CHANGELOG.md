@@ -4,7 +4,8 @@
 
 - Replaced the answer-leading `avoid-duplicate` prompt with a neutral release-readiness assessment requiring actual repository and skill inspection.
 - Bumped reproducible fixture manifest schema to 2 to reject the prior v8.3 fixture set; existing Git-private reviewer measurements must remain unchanged and are not comparable across prompt revisions.
-- Added two RED-to-GREEN regression tests. No host activation claims, automatic grading, telemetry, or new skill behavior.
+- Added two RED-to-GREEN regression tests for revised fixtures, without asserting live host activation.
+- Added optional, loopback-only Codex OTLP/HTTP JSON skill-event probe and four unit tests; ephemeral, counter-only diagnostic with no stored raw telemetry, global Codex config edits, or automatic pilot result changes.
 
 ## Unreleased — Windows skill-installation ACL compatibility
 
