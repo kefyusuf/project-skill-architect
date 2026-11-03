@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-release-example",
+  "runs": [
+    {
+      "case_id": "needs-release-review",
+      "phase": "baseline",
+      "skill": "release-review",
+      "host": "codex",
+      "expected": "invoke",
+      "observed": "invoke",
+      "verification": "pass",
+      "evidence": "reviewed_manual",
+      "skill_tokens": null
+    },
+    {
+      "case_id": "needs-release-review",
+      "phase": "candidate",
+      "skill": "release-review",
+      "host": "codex",
+      "expected": "invoke",
+      "observed": "invoke",
+      "verification": "pass",
+      "evidence": "reviewed_manual",
+      "skill_tokens": null
+    },
+    {
+      "case_id": "unrelated-typo-fix",
+      "phase": "baseline",
+      "skill": "release-review",
+      "host": "codex",
+      "expected": "skip",
+      "observed": "skip",
+      "verification": "unknown",
+      "evidence": "reviewed_manual",
+      "skill_tokens": null
+    },
+    {
+      "case_id": "unrelated-typo-fix",
+      "phase": "candidate",
+      "skill": "release-review",
+      "host": "codex",
+      "expected": "skip",
+      "observed": "skip",
+      "verification": "unknown",
+      "evidence": "reviewed_manual",
+      "skill_tokens": null
+    }
+  ]
+}

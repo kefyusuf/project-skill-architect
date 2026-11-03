@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "observations": [
+    {
+      "id": "deploy-failure-01",
+      "kind": "agent-failure",
+      "topic": "deployment-review",
+      "source": "review",
+      "summary": "Deployment review gate was skipped in a first documented run",
+      "occurrence": "run-01",
+      "evidence_paths": []
+    },
+    {
+      "id": "deploy-failure-02",
+      "kind": "agent-failure",
+      "topic": "deployment-review",
+      "source": "review",
+      "summary": "The same gate was skipped in a second distinct documented run",
+      "occurrence": "run-02",
+      "evidence_paths": []
+    }
+  ]
+}

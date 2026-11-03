@@ -35,7 +35,7 @@ You can optionally place a short checkpoint instruction into an existing agent i
 ## Read-only inspection
 
 ```bash
-python scripts/inspect.py --repo /path/to/project
+python scripts/project_inspector.py --repo /path/to/project
 ```
 
 The scanner inventories common files and skill frontmatter, does not read application source or secret files, and does not write to the repository. It deliberately makes no claims about project correctness or full discovery in monorepos.
@@ -151,7 +151,7 @@ The included validator is lightweight. If available, use the official Agent Skil
 - `assets/skill-template.md`: optional content guide for generated skills
 - `assets/architecture-log-template.md`: optional project decision record
 - `assets/checkpoint-instruction.md`: optional short text for host instruction files
-- `scripts/inspect.py`: read-only bounded project inventory
+- `scripts/project_inspector.py`: read-only bounded project inventory
 - `scripts/checkpoint.py`: read-only compare and opt-in baseline recording
 - `scripts/distribute.py`: dry-run-first, guarded distribution
 - `scripts/validate.py`: dependency-free structural validation
