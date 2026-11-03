@@ -56,6 +56,60 @@ For negative scenarios, use `--observed skip --verification unknown --evidence r
 
 To compare pre-change and post-change skills, create a fresh pilot and record **the same eight scenarios** with `--phase baseline` and `--phase candidate` on the same host and controlled configuration. Do not construct historical baseline results from memory. `record` blocks duplicate results and never silently overwrites them. Use a new pilot when you need a fresh trial.
 
+## v8.4 opt-in Codex OTLP/HTTP skill-event diagnostic
+
+The standard `codex exec --json` stream does not supply a complete skill non-activation audit. The optional `scripts/codex_otel_probe.py` accepts **only** OTLP/HTTP **JSON** logs on `127.0.0.1`, counts `codex.skill_invocation` for `project-skill-architect`, and discards the request payload after processing. It does **not** prove that missing events mean no invocation. This is not an exporter installation, persistent service, or replacement for manual task verification.
+
+**Security and interpretation:** Codex sends **other log events** to the configured exporter, including potentially sensitive tool-result data and identifiers. Use this tool **only in a disposable synthetic fixture** with a trusted loopback host. Do not use it for application repos or private sessions. The receiver parses data in memory and prints counters only; never publish raw HTTP traffic or session output. Avoid port sharing; a different local process can send events to the same endpoint. A positive event is supporting activation evidence, not proof of task correctness or of the event's integrity. An absent event or missing delivery remains `unknown`.
+
+From the root of the **existing** project-skill-architect checkout, with the reviewed `psa-fixtures-v84` fixtures already prepared, start the disposable collector in **PowerShell terminal 1**:
+
+```powershell
+python scripts/codex_otel_probe.py --port 43181
+```
+
+In **terminal 2**, stage a fresh synthetic case and install the reviewed skill copy:
+
+```powershell
+$fixtures = Join-Path $env:TEMP "psa-fixtures-v84"
+$runs = Join-Path $env:TEMP "psa-pilot-64d9c35f\\runs"
+New-Item -ItemType Directory -Force -Path $runs | Out-Null
+$dest = Join-Path $runs ("codex-v84-otel-" + [guid]::NewGuid().ToString("N").Substring(0,8))
+$stageRaw = python scripts/pilot_lab.py stage --fixtures $fixtures --case avoid-duplicate --dest $dest
+if ($LASTEXITCODE -ne 0) { throw "Staging failed" }
+$stage = $stageRaw | ConvertFrom-Json
+python scripts/distribute.py --source . --repo $dest --targets common --apply
+if ($LASTEXITCODE -ne 0) { throw "Installation failed" }
+
+# CLI-only opt-in; never modify global Codex configuration.
+$otel = 'otel.exporter={otlp-http={endpoint="http://127.0.0.1:43181/v1/logs",protocol="json"}}'
+Push-Location $dest
+try {
+    codex exec --json --ephemeral --ignore-user-config `
+        -c $otel `
+        -c 'otel.log_user_prompt=false' `
+        -c 'otel.log_agent_responses=false' `
+        -c 'otel.metrics_exporter="none"' `
+        -c 'otel.trace_exporter="none"' `
+        -c 'windows.sandbox="elevated"' `
+        --sandbox read-only $stage.prompt |
+        ForEach-Object {
+            try {
+                $event = $_ | ConvertFrom-Json -ErrorAction Stop
+                if ($event.type -eq "item.completed" -and $event.item.type -eq "agent_message") {
+                    $event.item.text
+                }
+            }
+            catch { Write-Warning "Invalid Codex JSON event" }
+        }
+}
+finally { Pop-Location }
+```
+
+Once Codex exits, stop terminal 1 with `Ctrl+C`. Review its `SUMMARY`. `psa_events > 0` means a PSA event was received; `requests=0` means delivery was not observed. `psa_events=0` **never** means `skip`. The receiver currently supports JSON OTLP only; a binary-protobuf exporter will be rejected. This local diagnostic is not a controlled baseline, and it does not overwrite `pilot-codex.json` or `pilot-codex-v84.json`. Record an independently reviewed outcome only in a distinct pilot session.
+
+See official Codex OTEL documentation at https://learn.chatgpt.com/docs/config-file/config-advanced and https://github.com/openai/codex/blob/main/codex-rs/otel/README.md for the current event and exporter contracts.
+
 ## Reading the report
 
 - `progress`: per-phase number of **observed**, unknown and verified cases. This is completion accounting, **not a quality score**.
